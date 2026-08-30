@@ -6,7 +6,10 @@ import type { AddressInfo } from "node:net";
 import test from "node:test";
 
 import { ScheduleDatabase } from "../../gateway/database.ts";
-import { scheduledExtensionPaths } from "../../gateway/pi-runner.ts";
+import {
+  scheduledExtensionPaths,
+  scheduledModelSelection,
+} from "../../gateway/pi-runner.ts";
 import { requiresInteractiveApproval } from "../../extensions/red-permissions.ts";
 import { Scheduler, MISFIRE_GRACE_MS } from "../../gateway/scheduler.ts";
 import { createGatewayServer } from "../../gateway/server.ts";
@@ -146,6 +149,28 @@ test("headless scheduled sessions omit the interactive permission gateway", () =
   assert.equal(paths.some((path) => path.endsWith("red-permissions.ts")), false);
   assert.equal(paths.some((path) => path.endsWith("pi-web-access/index.ts")), true);
   assert.equal(paths.some((path) => path.endsWith("pi-mcp-adapter/index.ts")), true);
+});
+
+test("scheduled sessions use Pi's configured provider, model, and thinking level", () => {
+  const selection = scheduledModelSelection({
+    getDefaultProvider: () => "my-openai-compatible",
+    getDefaultModel: () => "my-model",
+    getDefaultThinkingLevel: () => "high",
+  });
+  assert.deepEqual(selection, {
+    provider: "my-openai-compatible",
+    modelId: "my-model",
+    thinkingLevel: "high",
+  });
+
+  assert.throws(
+    () => scheduledModelSelection({
+      getDefaultProvider: () => undefined,
+      getDefaultModel: () => undefined,
+      getDefaultThinkingLevel: () => undefined,
+    }),
+    /no default model/i,
+  );
 });
 
 test("ordinary interactive protected and external tools remain approval-gated", () => {

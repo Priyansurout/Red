@@ -64,12 +64,33 @@ if [[ ":$PATH:" != *":$install_bin_dir:"* ]]; then
   echo "  export PATH=\"$install_bin_dir:\$PATH\""
 fi
 
-if pi auth check --provider openrouter >/dev/null 2>&1; then
-  echo "OpenRouter authentication is ready."
+model_selection="$(node - "$HOME/.pi/agent/settings.json" <<'NODE'
+const { readFileSync } = require("node:fs");
+const path = process.argv[2];
+try {
+  const settings = JSON.parse(readFileSync(path, "utf8"));
+  if (settings.defaultProvider && settings.defaultModel) {
+    process.stdout.write(`${settings.defaultProvider}\t${settings.defaultModel}`);
+  }
+} catch {}
+NODE
+)"
+
+if [[ -n "$model_selection" ]]; then
+  selected_provider="${model_selection%%$'\t'*}"
+  selected_model="${model_selection#*$'\t'}"
+  echo "Selected model: $selected_provider/$selected_model"
+  if pi auth check --provider "$selected_provider" >/dev/null 2>&1; then
+    echo "Provider authentication is ready."
+  else
+    echo "Provider authentication is not ready yet. Use '/login' for a built-in"
+    echo "provider, or verify the API-key source in your custom models.json."
+  fi
   echo "Install the scheduler with:"
   echo "  $red_root/gateway/red-gateway-control.sh install"
 else
-  echo "Next, run 'pi', enter '/login openrouter', and finish authentication."
-  echo "Then install the scheduler with:"
+  echo "Next, run 'pi', use '/login' to authenticate a provider, and use '/model'"
+  echo "to choose any model. Custom OpenAI-compatible setup is documented in"
+  echo "docs/SETUP.md. Then install the scheduler with:"
   echo "  $red_root/gateway/red-gateway-control.sh install"
 fi

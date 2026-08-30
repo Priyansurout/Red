@@ -1,0 +1,25 @@
+{
+  "providers": {
+    "my-openai-compatible": {
+      "baseUrl": "https://api.example.com/v1",
+      "api": "openai-completions",
+      "apiKey": "!security find-generic-password -a red -s red-openai-compatible -w",
+      "models": [
+        {
+          "id": "your-model-id",
+          "name": "My OpenAI-Compatible Model",
+          "reasoning": false,
+          "input": ["text"],
+          "contextWindow": 128000,
+          "maxTokens": 16384,
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        }
+      ]
+    }
+  }
+}

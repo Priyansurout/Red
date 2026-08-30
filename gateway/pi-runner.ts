@@ -13,6 +13,19 @@ import {
 import { PI_AGENT_DIR, RED_ROOT, SCHEDULE_SESSION_DIR } from "./paths.ts";
 import type { CompletionRecord, Schedule } from "./types.ts";
 
+export interface ScheduledModelSelection {
+  provider: string;
+  modelId: string;
+  thinkingLevel:
+    | "off"
+    | "minimal"
+    | "low"
+    | "medium"
+    | "high"
+    | "xhigh"
+    | "max";
+}
+
 const EXCLUDED_TOOLS = [
   "bg_run",
   "bg_run_pi_attested",
@@ -37,6 +50,26 @@ export function scheduledExtensionPaths(
   ];
 }
 
+export function scheduledModelSelection(
+  settings: Pick<
+    SettingsManager,
+    "getDefaultProvider" | "getDefaultModel" | "getDefaultThinkingLevel"
+  >,
+): ScheduledModelSelection {
+  const provider = settings.getDefaultProvider();
+  const modelId = settings.getDefaultModel();
+  if (!provider || !modelId) {
+    throw new Error(
+      "Red has no default model. Run pi, use /login and /model, then restart the gateway.",
+    );
+  }
+  return {
+    provider,
+    modelId,
+    thinkingLevel: settings.getDefaultThinkingLevel() ?? "medium",
+  };
+}
+
 function desktopNotification(schedule: Schedule, status: CompletionRecord["status"]): void {
   const title = status === "succeeded" ? "Red schedule completed" : `Red schedule ${status}`;
   const body = `${schedule.id}: ${schedule.instruction.slice(0, 100)}`;
@@ -57,13 +90,20 @@ export class PiScheduleRunner {
   }
 
   static async create(): Promise<PiScheduleRunner> {
+    const settings = SettingsManager.create(RED_ROOT, PI_AGENT_DIR, {
+      projectTrusted: true,
+    });
+    const selection = scheduledModelSelection(settings);
     const runtime = await ModelRuntime.create({
       authPath: join(PI_AGENT_DIR, "auth.json"),
       modelsPath: join(PI_AGENT_DIR, "models.json"),
       refreshOnCreate: false,
     });
-    if (!runtime.getModel("openrouter", "z-ai/glm-5.2")) {
-      throw new Error("OpenRouter model z-ai/glm-5.2 is not available to the gateway.");
+    if (!runtime.getModel(selection.provider, selection.modelId)) {
+      throw new Error(
+        `Configured model ${selection.provider}/${selection.modelId} is not available. ` +
+        "Choose another model with /model or configure it in ~/.pi/agent/models.json.",
+      );
     }
     return new PiScheduleRunner(runtime);
   }
@@ -75,6 +115,7 @@ export class PiScheduleRunner {
     const settingsManager = SettingsManager.create(RED_ROOT, PI_AGENT_DIR, {
       projectTrusted: true,
     });
+    const selection = scheduledModelSelection(settingsManager);
     const loader = new DefaultResourceLoader({
       cwd: RED_ROOT,
       agentDir: PI_AGENT_DIR,
@@ -87,15 +128,20 @@ export class PiScheduleRunner {
     });
     await loader.reload({ resolveProjectTrust: async () => true });
 
-    const model = this.runtime.getModel("openrouter", "z-ai/glm-5.2");
-    if (!model) throw new Error("Configured OpenRouter model disappeared from the runtime.");
+    const model = this.runtime.getModel(selection.provider, selection.modelId);
+    if (!model) {
+      throw new Error(
+        `Configured model ${selection.provider}/${selection.modelId} is unavailable. ` +
+        "Restart the gateway after changing custom model configuration.",
+      );
+    }
 
     const { session } = await createAgentSession({
       cwd: RED_ROOT,
       agentDir: PI_AGENT_DIR,
       modelRuntime: this.runtime,
       model,
-      thinkingLevel: "medium",
+      thinkingLevel: selection.thinkingLevel,
       sessionManager: manager,
       settingsManager,
       resourceLoader: loader,

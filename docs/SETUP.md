@@ -14,7 +14,7 @@ npm --version
 
 If Node is missing, install a current Node 22 or Node 24 release using your preferred version manager or Homebrew. The setup script does not modify an existing Node installation.
 
-You also need an OpenRouter account with credits and access to the configured `z-ai/glm-5.2` model. Red does not store an API key in the repository.
+You also need one model available through a Pi-supported provider or an OpenAI-compatible endpoint. Red is provider-independent and does not store API keys in the repository.
 
 ## 2. Clone and install Red
 
@@ -55,7 +55,7 @@ export PATH="$HOME/.local/bin:$PATH"
 
 Open a new terminal or run `source ~/.zshrc`.
 
-## 4. Authenticate OpenRouter
+## 4. Choose a provider and model
 
 Start the base Pi application once:
 
@@ -63,13 +63,56 @@ Start the base Pi application once:
 pi
 ```
 
-Enter `/login openrouter`, choose the OpenRouter sign-in option, and finish the browser flow. Then exit Pi and verify readiness without printing the credential:
+Enter `/login`, choose any built-in provider, and finish its authentication flow. Pi supports providers such as OpenAI, Anthropic, Google, OpenRouter, xAI, Groq, Cerebras, Mistral, and others.
+
+Then enter `/model` and select the model Red should use. This becomes Pi's user-level default, so interactive Red and scheduled Red use the same provider and model.
+
+Exit Pi and verify authentication without printing the credential, replacing `PROVIDER` with the selected provider ID:
 
 ```bash
-pi auth check --provider openrouter
+pi auth check --provider PROVIDER
 ```
 
 Pi stores the credential outside the repository at `~/.pi/agent/auth.json`. Do not copy that file into Red or commit it.
+
+### Custom OpenAI-compatible API
+
+Pi can call local or hosted services that implement OpenAI Chat Completions, including Ollama, LM Studio, vLLM, and many inference gateways.
+
+Start from Red's example configuration:
+
+```bash
+mkdir -p "$HOME/.pi/agent"
+if [[ -e "$HOME/.pi/agent/models.json" ]]; then
+  echo "models.json already exists; merge the example provider instead."
+else
+  install -m 600 examples/models.openai-compatible.json "$HOME/.pi/agent/models.json"
+fi
+```
+
+If `~/.pi/agent/models.json` already exists, do not overwrite it. Instead, merge the `my-openai-compatible` provider from the example into its existing `providers` object.
+
+Edit the copied file and replace:
+
+- `https://api.example.com/v1` with the endpoint's base URL.
+- `your-model-id` with the model ID expected by that API.
+- Context/output limits with values supported by that model.
+
+For a hosted endpoint, store its API key in macOS Keychain. This command prompts securely because `-w` is last:
+
+```bash
+security add-generic-password -a red -s red-openai-compatible -U -w
+```
+
+The example retrieves that key at request time. This works for both terminal Red and the `launchd` scheduler without placing the secret in Git or relying on shell environment variables. For a keyless local service, replace the example's `apiKey` value with `"local"`.
+
+Check that Pi sees the custom model:
+
+```bash
+pi --list-models my-openai-compatible
+```
+
+Then run `pi`, enter `/model`, select `my-openai-compatible/your-model-id`, and exit. If the service uses the newer OpenAI Responses protocol instead of Chat Completions, change `api` from `openai-completions` to `openai-responses`.
 
 ## 5. Install the scheduler service
 
@@ -120,7 +163,9 @@ The due scan runs every 15 seconds, so execution can begin a few seconds after t
 
 ### Model
 
-The interactive model is configured in `.pi/settings.json`. The scheduled runner currently uses the matching OpenRouter model in `gateway/pi-runner.ts`. Change both locations together, then restart the gateway:
+Red does not pin a project model. Pi stores the selected default provider, model, and thinking level in `~/.pi/agent/settings.json`. The scheduled runner reads that same selection before every occurrence.
+
+Change models at any time with `/model`. Built-in model changes take effect for the next scheduled occurrence. Restart the gateway after adding or changing entries in `~/.pi/agent/models.json` so its custom model catalog reloads:
 
 ```bash
 ./gateway/red-gateway-control.sh restart
@@ -201,12 +246,14 @@ Then regenerate and restart it:
 
 ### Gateway says the model is unavailable
 
-Verify OpenRouter authentication and start Pi once so its model catalog is present:
+Open Pi, authenticate a provider with `/login`, and select a model with `/model`. Then check the selected provider without printing its credential:
 
 ```bash
-pi auth check --provider openrouter
-pi --list-models glm-5.2
+pi auth check --provider PROVIDER
+pi --list-models MODEL_NAME
 ```
+
+If it is a custom model, verify `~/.pi/agent/models.json` and restart the gateway.
 
 ### Moving the clone
 

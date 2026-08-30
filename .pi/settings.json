@@ -1,6 +1,4 @@
 {
-  "defaultProvider": "openrouter",
-  "defaultModel": "z-ai/glm-5.2",
   "quietStartup": true,
   "defaultTools": [
     "read",

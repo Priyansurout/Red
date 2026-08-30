@@ -32,6 +32,9 @@ Pi extension ── private Unix socket ──> red-gateway
   authorizes the whole occurrence; denial prevents it from running.
 - Interactive bash, writes, MCP, and external-service calls outside scheduled
   occurrences remain approval-gated.
+- The headless runner reads Pi's user-level default provider, model, and thinking
+  level, so scheduled and interactive Red use the same selection. Custom models
+  in `~/.pi/agent/models.json`, including OpenAI-compatible APIs, are supported.
 - Completion reports are delivered at least once. Red batches ready results in
   one hidden follow-up, records occurrence IDs in the interactive session, and
   acknowledges them only after that message is persisted. An aborted queued

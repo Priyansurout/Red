@@ -19,7 +19,7 @@ Requirements:
 
 - macOS
 - Node.js 22.19.0 or newer and npm
-- An OpenRouter account with access to `z-ai/glm-5.2`
+- Any model/provider supported by Pi, or an OpenAI-compatible API
 
 Clone and install:
 
@@ -29,13 +29,15 @@ cd Red
 ./scripts/setup.sh
 ```
 
-Authenticate Pi without placing an API key in this repository:
+Authenticate any built-in Pi provider without placing an API key in this repository:
 
 ```bash
 pi
 ```
 
-Inside Pi, enter `/login openrouter`, complete the sign-in flow, and exit. Pi stores the credential in `~/.pi/agent/auth.json`.
+Inside Pi, enter `/login`, choose a provider, and complete its sign-in flow. Then enter `/model` and select the model Red should use. Pi stores provider credentials and the default model outside this repository under `~/.pi/agent/`.
+
+Red is not tied to OpenRouter or GLM. To use Ollama, LM Studio, vLLM, a hosted proxy, or another OpenAI-compatible endpoint, follow the [custom model guide](docs/SETUP.md#custom-openai-compatible-api).
 
 Install and start Red's scheduler:
 
@@ -105,6 +107,6 @@ Inside Red:
 
 ## Local data and security
 
-Credentials, preferences, task output, schedule state, logs, and session histories stay local and are excluded from Git. In particular, never commit `~/.pi/agent/auth.json`, `.pi/tasks/`, `data/`, or `memory/PREFERENCES.md`.
+Credentials, custom model configuration, preferences, task output, schedule state, logs, and session histories stay local and are excluded from Git. In particular, never commit `~/.pi/agent/auth.json`, `.pi/tasks/`, `data/`, or `memory/PREFERENCES.md`.
 
 Interactive protected tools remain approval-gated. A default scheduled occurrence is pre-approved only for its future due-time execution; creating the schedule never runs it immediately.
