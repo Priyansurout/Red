@@ -1,0 +1,21 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Personal state and runtime output
+data/
+memory/PREFERENCES.md
+memory/*.tmp
+.pi/tasks/
+.pi/auth.json
+.pi/*.local.json
+permission-test.txt
+
+# Installed dependencies
+gateway/node_modules/
+.pi/npm/node_modules/
+
+# Logs and editor files
+*.log
+*.swp

@@ -1,0 +1,33 @@
+{
+  "defaultProvider": "openrouter",
+  "defaultModel": "z-ai/glm-5.2",
+  "quietStartup": true,
+  "defaultTools": [
+    "read",
+    "grep",
+    "find",
+    "ls",
+    "bash",
+    "write",
+    "edit"
+  ],
+  "extensions": [
+    "../extensions/red-header.ts",
+    "../extensions/red-background-tasks.ts",
+    "../extensions/red-background-indicator.ts",
+    "../extensions/red-scheduler.ts",
+    "../extensions/red-status.ts",
+    "../extensions/red-time.ts",
+    "../extensions/red-preferences.ts",
+    "../extensions/red-permissions.ts"
+  ],
+  "packages": [
+    "npm:pi-web-access",
+    {
+      "source": "npm:pi-background-tasks@latest",
+      "extensions": [
+        "extensions/anthropic-attribution.ts"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+#!/bin/zsh
+
+set -euo pipefail
+
+script_path="${0:A}"
+red_root="${script_path:h:h}"
+pi_binary="${RED_PI_BINARY:-}"
+red_skills="$red_root/.pi/skills"
+
+if [[ -z "$pi_binary" ]]; then
+  pi_binary="$(command -v pi || true)"
+fi
+
+if [[ -z "$pi_binary" || ! -x "$pi_binary" ]]; then
+  print -u2 "Red could not find Pi. Run ./scripts/setup.sh or set RED_PI_BINARY."
+  exit 1
+fi
+
+red_extensions=(
+  --extension "$red_root/extensions/red-header.ts"
+  --extension "$red_root/extensions/red-background-tasks.ts"
+  --extension "$red_root/extensions/red-background-indicator.ts"
+  --extension "$red_root/extensions/red-scheduler.ts"
+  --extension "$red_root/extensions/red-status.ts"
+  --extension "$red_root/extensions/red-time.ts"
+  --extension "$red_root/extensions/red-preferences.ts"
+  --extension "$red_root/extensions/red-permissions.ts"
+  --extension "$red_root/.pi/npm/node_modules/pi-background-tasks/extensions/anthropic-attribution.ts"
+  --extension "$red_root/.pi/npm/node_modules/pi-web-access/index.ts"
+  --extension "$red_root/.pi/npm/node_modules/pi-mcp-adapter/index.ts"
+)
+
+for ((index = 2; index <= ${#red_extensions}; index += 2)); do
+  extension_path="${red_extensions[$index]}"
+  if [[ ! -f "$extension_path" ]]; then
+    print -u2 "Red extension is missing: $extension_path"
+    print -u2 "Run ./scripts/setup.sh to install project dependencies."
+    exit 1
+  fi
+done
+
+cd "$red_root"
+
+# Pi otherwise auto-discovers ambient skills and extensions from the user's
+# global directories. Red owns its capability surface, so disable both and
+# explicitly admit only Red-managed resources.
+if [[ -d "$red_skills" ]]; then
+  PI_OFFLINE=1 exec "$pi_binary" \
+    --no-skills \
+    --no-extensions \
+    --skill "$red_skills" \
+    "${red_extensions[@]}" \
+    "$@"
+fi
+
+PI_OFFLINE=1 exec "$pi_binary" \
+  --no-skills \
+  --no-extensions \
+  "${red_extensions[@]}" \
+  "$@"
