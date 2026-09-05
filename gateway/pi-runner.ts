@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
+import { platform } from "node:os";
 
 import {
   createAgentSession,
@@ -70,14 +71,30 @@ export function scheduledModelSelection(
   };
 }
 
+function notificationCommand(title: string, body: string): [string, string[]] | null {
+  if (platform() === "darwin") {
+    const script = `display notification ${JSON.stringify(body)} with title ${JSON.stringify(title)}`;
+    return ["/usr/bin/osascript", ["-e", script]];
+  }
+  if (platform() === "linux") {
+    return ["notify-send", [title, body]];
+  }
+  return null;
+}
+
 function desktopNotification(schedule: Schedule, status: CompletionRecord["status"]): void {
   const title = status === "succeeded" ? "Red schedule completed" : `Red schedule ${status}`;
   const body = `${schedule.id}: ${schedule.instruction.slice(0, 100)}`;
-  const script = `display notification ${JSON.stringify(body)} with title ${JSON.stringify(title)}`;
-  const child = spawn("/usr/bin/osascript", ["-e", script], {
+  const command = notificationCommand(title, body);
+  if (!command) {
+    return;
+  }
+  const [executable, args] = command;
+  const child = spawn(executable, args, {
     detached: true,
     stdio: "ignore",
   });
+  // A missing notification daemon must never fail a completed schedule.
   child.on("error", (error) => console.warn("Notification failed:", error.message));
   child.unref();
 }

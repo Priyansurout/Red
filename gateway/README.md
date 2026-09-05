@@ -22,9 +22,10 @@ Pi extension ── private Unix socket ──> red-gateway
 
 - `data/red.sqlite` holds current schedule state and is never used as a timer.
 - `data/sessions/<schedule-id>/` holds the detailed Pi conversation history.
-- `launchd` keeps the gateway alive while the Mac is awake and restarts it.
-- If the Mac is asleep or powered off, nothing runs. Startup recovery marks a
-  one-time occurrence missed after its two-minute grace period.
+- The platform service manager keeps the gateway alive while the machine is
+  awake and restarts it: `launchd` on macOS, `systemd --user` on Linux.
+- If the machine is asleep or powered off, nothing runs. Startup recovery marks
+  a one-time occurrence missed after its two-minute grace period.
 - `permission_required = false` (the default) pre-approves the entire future
   occurrence and all nested tools. The headless runner does not load Red's
   interactive permission gateway.
@@ -59,10 +60,15 @@ npm test
 ./red-gateway-control.sh restart
 ```
 
-`./red-gateway-control.sh install` generates a machine-specific LaunchAgent at
-`~/Library/LaunchAgents/io.github.priyansurout.red-gateway.plist`. It resolves
+`./red-gateway-control.sh install` generates a machine-specific service
+definition: a LaunchAgent at
+`~/Library/LaunchAgents/io.github.priyansurout.red-gateway.plist` on macOS, or a
+user unit at `~/.config/systemd/user/red-gateway.service` on Linux. It resolves
 the checkout and Node binary dynamically, so Red does not depend on one user's
 home directory or Homebrew prefix. Runtime data and logs are ignored by Git
 under `Red/data/`.
+
+On Linux, run `sudo loginctl enable-linger "$USER"` once so the user service
+manager — and therefore the scheduler — survives logout and starts at boot.
 
 For the complete fresh-machine walkthrough, see [`../docs/SETUP.md`](../docs/SETUP.md).
