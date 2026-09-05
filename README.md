@@ -2,7 +2,7 @@
 
 Red is a local-first AI agent built on [Pi](https://github.com/earendil-works/pi-mono). It combines an interactive terminal agent with background commands, persistent preferences, web and MCP tools, and a durable macOS scheduler.
 
-Red is currently a macOS-focused bootstrap project. The interactive agent can be adapted to other platforms, but the always-on scheduling service uses `launchd`.
+Red is a bootstrap project. The always-on scheduling service runs under `launchd` on macOS and `systemd --user` on Linux.
 
 ## What Red can do
 
@@ -17,7 +17,7 @@ Red is currently a macOS-focused bootstrap project. The interactive agent can be
 
 Requirements:
 
-- macOS
+- macOS, or Linux with `systemd`
 - Node.js 22.19.0 or newer and npm
 - Any model/provider supported by Pi, or an OpenAI-compatible API
 
@@ -51,7 +51,7 @@ If `~/.local/bin` is already on your `PATH`, launch Red with:
 red
 ```
 
-Otherwise, add this to `~/.zshrc`, open a new terminal, and run `red`:
+Otherwise, add this to your shell profile (`~/.zshrc` or `~/.bashrc`), open a new terminal, and run `red`:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"

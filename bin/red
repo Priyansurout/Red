@@ -1,9 +1,16 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 
 set -euo pipefail
 
-script_path="${0:A}"
-red_root="${script_path:h:h}"
+script_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/$(basename "${BASH_SOURCE[0]}")"
+while [[ -L "$script_path" ]]; do
+  link_target="$(readlink "$script_path")"
+  if [[ "$link_target" != /* ]]; then
+    link_target="$(dirname "$script_path")/$link_target"
+  fi
+  script_path="$(cd "$(dirname "$link_target")" && pwd -P)/$(basename "$link_target")"
+done
+red_root="$(cd "$(dirname "$script_path")/.." && pwd -P)"
 pi_binary="${RED_PI_BINARY:-}"
 red_skills="$red_root/.pi/skills"
 
@@ -12,7 +19,7 @@ if [[ -z "$pi_binary" ]]; then
 fi
 
 if [[ -z "$pi_binary" || ! -x "$pi_binary" ]]; then
-  print -u2 "Red could not find Pi. Run ./scripts/setup.sh or set RED_PI_BINARY."
+  printf '%s\n' "Red could not find Pi. Run ./scripts/setup.sh or set RED_PI_BINARY." >&2
   exit 1
 fi
 
@@ -30,11 +37,11 @@ red_extensions=(
   --extension "$red_root/.pi/npm/node_modules/pi-mcp-adapter/index.ts"
 )
 
-for ((index = 2; index <= ${#red_extensions}; index += 2)); do
+for ((index = 1; index < ${#red_extensions[@]}; index += 2)); do
   extension_path="${red_extensions[$index]}"
   if [[ ! -f "$extension_path" ]]; then
-    print -u2 "Red extension is missing: $extension_path"
-    print -u2 "Run ./scripts/setup.sh to install project dependencies."
+    printf '%s\n' "Red extension is missing: $extension_path" >&2
+    printf '%s\n' "Run ./scripts/setup.sh to install project dependencies." >&2
     exit 1
   fi
 done

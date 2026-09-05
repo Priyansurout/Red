@@ -1,10 +1,10 @@
 # Local setup guide
 
-This guide installs Red on a Mac from a fresh clone and explains every persistent change made to the machine.
+This guide installs Red from a fresh clone and explains every persistent change made to the machine. It covers macOS (`launchd`) and Linux (`systemd --user`).
 
 ## 1. Install prerequisites
 
-Red needs macOS, Git, and Node.js 22.19.0 or newer. Check them first:
+Red needs macOS or a Linux system with `systemd`, plus Git and Node.js 22.19.0 or newer. Check them first:
 
 ```bash
 git --version
@@ -12,7 +12,13 @@ node --version
 npm --version
 ```
 
-If Node is missing, install a current Node 22 or Node 24 release using your preferred version manager or Homebrew. The setup script does not modify an existing Node installation.
+If Node is missing, install a current Node 22 or Node 24 release using your preferred version manager, Homebrew, or your distribution's packages. The setup script does not modify an existing Node installation.
+
+On Linux, confirm that a user service manager is available:
+
+```bash
+systemctl --user status
+```
 
 You also need one model available through a Pi-supported provider or an OpenAI-compatible endpoint. Red is provider-independent and does not store API keys in the repository.
 
@@ -26,7 +32,7 @@ cd Red
 
 The setup script performs four actions:
 
-1. Checks macOS and the Node version.
+1. Checks the platform (macOS or Linux with `systemctl`) and the Node version.
 2. Installs Pi 0.84.2 globally only when the `pi` command is missing.
 3. Runs `npm ci` for the gateway and Red's project-local Pi extensions.
 4. Creates `~/.local/bin/red` as a symbolic link to this checkout.
@@ -47,13 +53,13 @@ Check whether the command is already visible:
 command -v red
 ```
 
-If it prints nothing, add this line to `~/.zshrc`:
+If it prints nothing, add this line to your shell profile (`~/.zshrc` for zsh, `~/.bashrc` for bash):
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-Open a new terminal or run `source ~/.zshrc`.
+Open a new terminal, or re-source that profile.
 
 ## 4. Choose a provider and model
 
@@ -98,13 +104,27 @@ Edit the copied file and replace:
 - `your-model-id` with the model ID expected by that API.
 - Context/output limits with values supported by that model.
 
-For a hosted endpoint, store its API key in macOS Keychain. This command prompts securely because `-w` is last:
+For a hosted endpoint, store its API key in your platform's secret store. The example's `apiKey` value is a `!`-prefixed command that Pi runs at request time, so the secret never enters Git or a shell environment variable.
+
+On macOS, use the Keychain. This command prompts securely because `-w` is last:
 
 ```bash
 security add-generic-password -a red -s red-openai-compatible -U -w
 ```
 
-The example retrieves that key at request time. This works for both terminal Red and the `launchd` scheduler without placing the secret in Git or relying on shell environment variables. For a keyless local service, replace the example's `apiKey` value with `"local"`.
+On Linux, use `secret-tool` from `libsecret` against a running keyring:
+
+```bash
+secret-tool store --label="Red OpenAI-compatible" service red-openai-compatible account red
+```
+
+Then set the example's `apiKey` to the matching lookup command:
+
+```json
+"apiKey": "!secret-tool lookup service red-openai-compatible account red"
+```
+
+Either form works for both terminal Red and the scheduler service. For a keyless local service such as Ollama or LM Studio, replace the `apiKey` value with `"local"`.
 
 Check that Pi sees the custom model:
 
@@ -121,15 +141,31 @@ Then run `pi`, enter `/model`, select `my-openai-compatible/your-model-id`, and 
 ./gateway/red-gateway-control.sh status
 ```
 
-The install command generates a machine-specific LaunchAgent at:
+The install command generates a machine-specific service definition for the current platform.
+
+On macOS, a LaunchAgent at:
 
 ```text
 ~/Library/LaunchAgents/io.github.priyansurout.red-gateway.plist
 ```
 
-The generated file contains the current clone path and the current Node binary path. `launchd` starts the gateway immediately, restarts it after failures, and starts it again after login.
+On Linux, a user unit at:
 
-The scheduler only runs while the Mac is awake. A one-time occurrence more than two minutes late is marked missed instead of being executed unexpectedly.
+```text
+~/.config/systemd/user/red-gateway.service
+```
+
+The generated file contains the current clone path and the current Node binary path. The service manager starts the gateway immediately, restarts it after failures, and starts it again after login.
+
+On Linux, the user service manager normally stops at logout. To keep the scheduler always-on and start it at boot, enable lingering once:
+
+```bash
+sudo loginctl enable-linger "$USER"
+```
+
+The install command checks this and prints the same reminder when lingering is off.
+
+The scheduler only runs while the machine is awake. A one-time occurrence more than two minutes late is marked missed instead of being executed unexpectedly.
 
 ## 6. Start Red and verify it
 
@@ -201,7 +237,7 @@ memory/PREFERENCES.md       personal preference memory
 ./gateway/red-gateway-control.sh uninstall
 ```
 
-`uninstall` stops the service and preserves its plist with a `.disabled` suffix (and a timestamp if needed). It does not delete schedules, histories, credentials, or preferences.
+`uninstall` stops the service and preserves its definition — the LaunchAgent plist on macOS, the systemd unit on Linux — with a `.disabled` suffix (and a timestamp if needed). It does not delete schedules, histories, credentials, or preferences.
 
 ## Updating
 
@@ -215,7 +251,7 @@ npm --prefix gateway test
 ./gateway/red-gateway-control.sh install
 ```
 
-Using `install` again regenerates the LaunchAgent, which is required if the repository or Node binary moved.
+Using `install` again regenerates the service definition, which is required if the repository or Node binary moved.
 
 ## Troubleshooting
 
@@ -257,7 +293,7 @@ If it is a custom model, verify `~/.pi/agent/models.json` and restart the gatewa
 
 ### Moving the clone
 
-The `red` command resolves the checkout through its symbolic link, but the LaunchAgent stores an absolute path. After moving the repository, run:
+The `red` command resolves the checkout through its symbolic link, but the generated service definition stores an absolute path. After moving the repository, run:
 
 ```bash
 ./gateway/red-gateway-control.sh install

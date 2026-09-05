@@ -1,21 +1,32 @@
-#!/bin/zsh
+#!/usr/bin/env bash
 
 set -euo pipefail
 
-script_path="${0:A}"
-red_root="${script_path:h:h}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+red_root="$(cd "$script_dir/.." && pwd -P)"
 pi_package="@earendil-works/pi-coding-agent@0.84.2"
 minimum_node="22.19.0"
 install_bin_dir="${RED_INSTALL_BIN_DIR:-$HOME/.local/bin}"
+platform="$(uname -s)"
 
 fail() {
-  print -u2 "Setup failed: $1"
+  printf '%s\n' "Setup failed: $1" >&2
   exit 1
 }
 
-if [[ "$(uname -s)" != "Darwin" ]]; then
-  fail "the always-on scheduler currently requires macOS launchd."
-fi
+case "$platform" in
+  Darwin)
+    scheduler_hint="$red_root/gateway/red-gateway-control.sh install"
+    ;;
+  Linux)
+    command -v systemctl >/dev/null 2>&1 \
+      || fail "the always-on scheduler requires systemd (systemctl) on Linux."
+    scheduler_hint="$red_root/gateway/red-gateway-control.sh install"
+    ;;
+  *)
+    fail "the always-on scheduler supports macOS (launchd) and Linux (systemd) only; found $platform."
+    ;;
+esac
 
 command -v node >/dev/null 2>&1 || fail "Node.js $minimum_node or newer is required."
 command -v npm >/dev/null 2>&1 || fail "npm is required."
@@ -35,9 +46,10 @@ if ! command -v pi >/dev/null 2>&1; then
 fi
 
 pi_version="$(pi --version)"
-if [[ "$pi_version" != 0.84.* ]]; then
-  echo "Warning: Red is tested with Pi 0.84.x; found $pi_version."
-fi
+case "$pi_version" in
+  0.84.*) ;;
+  *) echo "Warning: Red is tested with Pi 0.84.x; found $pi_version." ;;
+esac
 
 echo "Installing Red's pinned dependencies..."
 npm ci --prefix "$red_root/gateway"
@@ -48,7 +60,7 @@ mkdir -p "$install_bin_dir"
 
 red_command="$install_bin_dir/red"
 if [[ -e "$red_command" || -L "$red_command" ]]; then
-  if [[ "${red_command:A}" != "${red_root}/bin/red" ]]; then
+  if [[ "$(readlink -f "$red_command")" != "$(readlink -f "$red_root/bin/red")" ]]; then
     fail "$red_command already exists and does not point to this checkout."
   fi
 else
@@ -60,7 +72,7 @@ echo "Red's code and dependencies are installed."
 echo "Command: $red_command"
 
 if [[ ":$PATH:" != *":$install_bin_dir:"* ]]; then
-  echo "Add this line to ~/.zshrc, then open a new terminal:"
+  echo "Add this line to your shell profile, then open a new terminal:"
   echo "  export PATH=\"$install_bin_dir:\$PATH\""
 fi
 
@@ -87,10 +99,10 @@ if [[ -n "$model_selection" ]]; then
     echo "provider, or verify the API-key source in your custom models.json."
   fi
   echo "Install the scheduler with:"
-  echo "  $red_root/gateway/red-gateway-control.sh install"
+  echo "  $scheduler_hint"
 else
   echo "Next, run 'pi', use '/login' to authenticate a provider, and use '/model'"
   echo "to choose any model. Custom OpenAI-compatible setup is documented in"
   echo "docs/SETUP.md. Then install the scheduler with:"
-  echo "  $red_root/gateway/red-gateway-control.sh install"
+  echo "  $scheduler_hint"
 fi
